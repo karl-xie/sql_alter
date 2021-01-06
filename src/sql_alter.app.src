@@ -1,0 +1,18 @@
+{application, sql_alter,
+ [{description, "An OTP application"},
+  {vsn, "0.1.0"},
+  {registered, []},
+  {mod, { sql_alter_app, []}},
+  {applications,
+   [kernel,
+    stdlib,
+    mysql_otp,
+    elmorm
+   ]},
+  {env,[]},
+  {modules, []},
+
+  {maintainers, []},
+  {licenses, ["Apache 2.0"]},
+  {links, []}
+ ]}.
