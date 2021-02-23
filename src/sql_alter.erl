@@ -4,6 +4,8 @@
 
 -define(TIMEOUT, 10000).
 -define(PRINT(F, M), io:format(standard_error, F ++ "~n", M)).
+%% -define(PRINT(F, M), io:format(F ++ "~n", M)).
+-define(OUTPUT(F, M), io:format(F ++ "~n", M)).
 
 -export([main/1]).
 
@@ -22,9 +24,29 @@ main(Args) ->
                                 #rec_opt{val = TType, sub = TSOpt} ->
                                     case get_ddl(erlang:binary_to_atom(TType, utf8), TSOpt) of
                                         {ok, TargetDLL} ->
-                                            case elmorm_compare:string(<<>>, TargetDLL) of
+                                            case elmorm_compare:string(SourceDLL, TargetDLL) of
                                                 {ok, Bin} ->
-                                                    Bin;
+                                                    case lists:keyfind(out, #rec_opt.key, Options) of
+                                                        #rec_opt{val = OutFile} ->
+                                                            case filelib:is_file(OutFile) of
+                                                                false ->
+                                                                    case file:open(OutFile, [binary, write]) of
+                                                                        {ok, IoDevice} ->
+                                                                            file:write(IoDevice, Bin),
+                                                                            file:close(IoDevice),
+                                                                            ok;
+                                                                        {error, Reason} ->
+                                                                            ?PRINT("open file fail of reason ~p", [Reason]),
+                                                                            erlang:halt(9)
+                                                                    end;
+                                                                true ->
+                                                                    ?PRINT("output file exists", []),
+                                                                    erlang:halt(8)
+                                                            end;
+                                                        _ ->
+                                                            io:format(standard_io, "~ts", [Bin]),
+                                                            ok
+                                                    end;
                                                 {error, Error} ->
                                                     ?PRINT("compare fail with reason ~p", [Error]),
                                                     erlang:halt(7)
@@ -76,7 +98,7 @@ get_ddl(mysql, Options) ->
                                         XSQL = <<"SHOW CREATE TABLE ", XTableName/binary, ";">>,
                                         {ok, _XFields, [[_, XDDL]]} = mysql:query(Conn, XSQL, ?TIMEOUT),
                                         ParentPid ! continue,
-                                        [<<"\n\n">>, XDDL | InAcc]
+                                        [<<";\n\n">>, XDDL | InAcc]
                                     end, [], Rows),
                                 ParentPid ! {ok, iolist_to_binary(lists:reverse(AllDLL))};
                             _ ->
