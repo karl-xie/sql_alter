@@ -16,56 +16,62 @@ main(Args) ->
     OptBin = build_opt_binary(Args, <<>>),
     case opt_decoder:decode(OptBin) of
         {ok, Options} ->
-            case lists:keyfind(source, #rec_opt.key, Options) of
-                #rec_opt{val = SType, sub = SSOpt} ->
-                    case get_ddl(erlang:binary_to_atom(SType, utf8), SSOpt) of
-                        {ok, SourceDLL} ->
-                            case lists:keyfind(target, #rec_opt.key, Options) of
-                                #rec_opt{val = TType, sub = TSOpt} ->
-                                    case get_ddl(erlang:binary_to_atom(TType, utf8), TSOpt) of
-                                        {ok, TargetDLL} ->
-                                            case elmorm_compare:string(SourceDLL, TargetDLL) of
-                                                {ok, Bin} ->
-                                                    case lists:keyfind(out, #rec_opt.key, Options) of
-                                                        #rec_opt{val = OutFile} ->
-                                                            case filelib:is_file(OutFile) of
-                                                                false ->
-                                                                    case file:open(OutFile, [binary, write]) of
-                                                                        {ok, IoDevice} ->
-                                                                            file:write(IoDevice, Bin),
-                                                                            file:close(IoDevice),
-                                                                            ok;
-                                                                        {error, Reason} ->
-                                                                            ?PRINT("open file fail of reason ~p", [Reason]),
-                                                                            erlang:halt(9)
+            case lists:keymember(help, #rec_opt.key, Options) of
+                true ->
+                    print_help_info(),
+                    ok;
+                false ->
+                    case lists:keyfind(source, #rec_opt.key, Options) of
+                        #rec_opt{val = SType, sub = SSOpt} ->
+                            case get_ddl(erlang:binary_to_atom(SType, utf8), SSOpt) of
+                                {ok, SourceDLL} ->
+                                    case lists:keyfind(target, #rec_opt.key, Options) of
+                                        #rec_opt{val = TType, sub = TSOpt} ->
+                                            case get_ddl(erlang:binary_to_atom(TType, utf8), TSOpt) of
+                                                {ok, TargetDLL} ->
+                                                    case elmorm_compare:string(SourceDLL, TargetDLL) of
+                                                        {ok, Bin} ->
+                                                            case lists:keyfind(out, #rec_opt.key, Options) of
+                                                                #rec_opt{val = OutFile} ->
+                                                                    case filelib:is_file(OutFile) of
+                                                                        false ->
+                                                                            case file:open(OutFile, [binary, write]) of
+                                                                                {ok, IoDevice} ->
+                                                                                    file:write(IoDevice, Bin),
+                                                                                    file:close(IoDevice),
+                                                                                    ok;
+                                                                                {error, Reason} ->
+                                                                                    ?PRINT("open file fail of reason ~p", [Reason]),
+                                                                                    erlang:halt(9)
+                                                                            end;
+                                                                        true ->
+                                                                            ?PRINT("output file exists", []),
+                                                                            erlang:halt(8)
                                                                     end;
-                                                                true ->
-                                                                    ?PRINT("output file exists", []),
-                                                                    erlang:halt(8)
+                                                                _ ->
+                                                                    io:format(standard_io, "~ts", [Bin]),
+                                                                    ok
                                                             end;
-                                                        _ ->
-                                                            io:format(standard_io, "~ts", [Bin]),
-                                                            ok
+                                                        {error, Error} ->
+                                                            ?PRINT("compare fail with reason ~p", [Error]),
+                                                            erlang:halt(7)
                                                     end;
-                                                {error, Error} ->
-                                                    ?PRINT("compare fail with reason ~p", [Error]),
-                                                    erlang:halt(7)
+                                                {false, Error} ->
+                                                    ?PRINT("get target dll fail with reason ~p", [Error]),
+                                                    erlang:halt(6)
                                             end;
-                                        {false, Error} ->
-                                            ?PRINT("get target dll fail with reason ~p", [Error]),
-                                            erlang:halt(6)
+                                        _ ->
+                                            ?PRINT("target not found", []),
+                                            erlang:halt(5)
                                     end;
-                                _ ->
-                                    ?PRINT("target not found", []),
-                                    erlang:halt(5)
+                                {false, Error} ->
+                                    ?PRINT("get source dll fail with reason ~p", [Error]),
+                                    erlang:halt(4)
                             end;
-                        {false, Error} ->
-                            ?PRINT("get source dll fail with reason ~p", [Error]),
-                            erlang:halt(4)
-                    end;
-                _ ->
-                    ?PRINT("source not found", []),
-                    erlang:halt(3)
+                        _ ->
+                            ?PRINT("source not found", []),
+                            erlang:halt(3)
+                    end
             end;
         {false, Error} ->
             ?PRINT("decode args with reason ~p", [Error]),
@@ -181,3 +187,17 @@ get_mysql_options([{database, _} | T], Options, Result) ->
         Val ->
             get_mysql_options(T, Options, [{database, erlang:binary_to_list(Val)} | Result])
     end.
+
+print_help_info() ->
+    io:format("useage : escript sql_alter -source = SourceType [--subopt=value] -target=TargetType [--subopts=value] [-out=OutFile]~n", []),
+    io:format("  SourceType, TargetType : mysql, file~n", []),
+    io:format("  OutFile : filename which will be write the upgrade statement~n", []),
+    io:format("    sub options for mysql:~n", []),
+    io:format("      --host=Host, default is localhost~n", []),
+    io:format("      --port=Port, default is 3306~n", []),
+    io:format("      --user=User, default is root~n", []),
+    io:format("      --password=Password~n", []),
+    io:format("      --database=Database~n", []),
+    io:format("    sub options for file:~n", []),
+    io:format("      --name=FileName~n", []),
+    ok.

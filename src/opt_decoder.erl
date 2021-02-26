@@ -53,8 +53,8 @@ get_key_value(Binary) ->
                         false ->
                             {false, {no_opt_value, Rest1}}
                     end;
-                _ ->
-                    {false, {no_equal_symbol, Rest}}
+                Rest2 ->
+                    {ok, KeyToken, <<"true">>, Rest2}
             end;
         false ->
             {false, {no_opt_key, Binary}}
